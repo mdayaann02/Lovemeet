@@ -1,0 +1,153 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 4.1: Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidCallRoom(data) {
+      return data.roomCode is string && data.roomCode.size() >= 4 && data.roomCode.size() <= 16 && data.roomCode.matches('^[a-zA-Z0-9_\\-]+$') &&
+             data.roomTitle is string && data.roomTitle.size() >= 1 && data.roomTitle.size() <= 60 &&
+             data.hostUid is string && isValidId(data.hostUid) &&
+             data.hostName is string && data.hostName.size() >= 1 && data.hostName.size() <= 60 &&
+             data.guestUid is string && data.guestUid.size() <= 128 && (data.guestUid == '' || isValidId(data.guestUid)) &&
+             data.guestName is string && data.guestName.size() <= 60 &&
+             data.status is string && data.status in ['waiting', 'active', 'ended'] &&
+             data.hostMuted is bool &&
+             data.hostCameraOn is bool &&
+             data.hostScreenSharing is bool &&
+             data.guestMuted is bool &&
+             data.guestCameraOn is bool &&
+             data.guestScreenSharing is bool &&
+             data.sdpOffer is string && data.sdpOffer.size() <= 5000 &&
+             data.sdpAnswer is string && data.sdpAnswer.size() <= 5000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidReactionEvent(data) {
+      return data.roomId is string && isValidId(data.roomId) &&
+             data.senderUid is string && data.senderUid == request.auth.uid && isValidId(data.senderUid) &&
+             data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 60 &&
+             data.gestureType is string && data.gestureType in ['HEART', 'KISS', 'THUMBS_UP', 'FIREWORKS', 'PEACE', 'LAUGH'] &&
+             data.emoji is string && data.emoji.size() >= 1 && data.emoji.size() <= 16 &&
+             data.source is string && data.source in ['AI_GESTURE', 'MANUAL_BAR'] &&
+             data.originX is int && data.originX >= 0 && data.originX <= 100 &&
+             data.originY is int && data.originY >= 0 && data.originY <= 100 &&
+             data.confidencePercent is int && data.confidencePercent >= 0 && data.confidencePercent <= 100 &&
+             data.allowedUids is list && data.allowedUids.size() >= 1 && data.allowedUids.size() <= 2 &&
+             data.allowedUids[0] is string && data.allowedUids[0].size() <= 128 &&
+             request.auth.uid in data.allowedUids &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    match /rooms/{roomId} {
+      allow get: if isSignedIn() &&
+                    isValidId(roomId) &&
+                    (existing().hostUid == request.auth.uid ||
+                     (existing().guestUid != '' && existing().guestUid == request.auth.uid));
+
+      allow list: if isSignedIn() &&
+                     existing().hostUid == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(roomId) &&
+                       incoming().keys().hasAll([
+                         'roomCode', 'roomTitle', 'hostUid', 'hostName',
+                         'guestUid', 'guestName', 'status',
+                         'hostMuted', 'hostCameraOn', 'hostScreenSharing',
+                         'guestMuted', 'guestCameraOn', 'guestScreenSharing',
+                         'sdpOffer', 'sdpAnswer', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'roomCode', 'roomTitle', 'hostUid', 'hostName',
+                         'guestUid', 'guestName', 'status',
+                         'hostMuted', 'hostCameraOn', 'hostScreenSharing',
+                         'guestMuted', 'guestCameraOn', 'guestScreenSharing',
+                         'sdpOffer', 'sdpAnswer', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().roomCode == roomId &&
+                       incoming().hostUid == request.auth.uid &&
+                       incoming().guestUid == '' &&
+                       incoming().status == 'waiting' &&
+                       isValidCallRoom(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(roomId) &&
+                       isValidCallRoom(incoming()) &&
+                       existing().status != 'ended' &&
+                       incoming().roomCode == existing().roomCode &&
+                       incoming().hostUid == existing().hostUid &&
+                       incoming().createdAt == existing().createdAt && (
+                         // Action 1: Guest joins a waiting room
+                         (existing().status == 'waiting' &&
+                          existing().guestUid == '' &&
+                          request.auth.uid != existing().hostUid &&
+                          incoming().guestUid == request.auth.uid &&
+                          incoming().status == 'active' &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['guestUid', 'guestName', 'status', 'sdpAnswer', 'updatedAt'])) ||
+                         // Action 2: Host updates media toggles, signaling offer, title, or ends call
+                         (request.auth.uid == existing().hostUid &&
+                          incoming().guestUid == existing().guestUid &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['roomTitle', 'status', 'hostMuted', 'hostCameraOn', 'hostScreenSharing', 'sdpOffer', 'updatedAt'])) ||
+                         // Action 3: Joined guest updates media toggles, signaling answer, or ends call
+                         (existing().guestUid != '' &&
+                          request.auth.uid == existing().guestUid &&
+                          incoming().guestUid == existing().guestUid &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'guestMuted', 'guestCameraOn', 'guestScreenSharing', 'sdpAnswer', 'updatedAt']))
+                       );
+
+      allow delete: if isSignedIn() &&
+                       isValidId(roomId) &&
+                       existing().hostUid == request.auth.uid;
+
+      match /reactions/{reactionId} {
+        allow get: if isSignedIn() &&
+                      isValidId(roomId) &&
+                      isValidId(reactionId) &&
+                      request.auth.uid in existing().allowedUids;
+
+        allow list: if isSignedIn() &&
+                       request.auth.uid in existing().allowedUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(roomId) &&
+                         isValidId(reactionId) &&
+                         incoming().keys().hasAll([
+                           'roomId', 'senderUid', 'senderName', 'gestureType',
+                           'emoji', 'source', 'originX', 'originY',
+                           'confidencePercent', 'allowedUids', 'createdAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'roomId', 'senderUid', 'senderName', 'gestureType',
+                           'emoji', 'source', 'originX', 'originY',
+                           'confidencePercent', 'allowedUids', 'createdAt'
+                         ]) &&
+                         incoming().roomId == roomId &&
+                         isValidReactionEvent(incoming()) &&
+                         exists(/databases/$(database)/documents/rooms/$(roomId)) &&
+                         (get(/databases/$(database)/documents/rooms/$(roomId)).data.hostUid == request.auth.uid ||
+                          get(/databases/$(database)/documents/rooms/$(roomId)).data.guestUid == request.auth.uid);
+
+        allow update, delete: if false;
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Video Camera Frame Silhouette -->
+    <path
+        android:fillColor="#06B6D4"
+        android:pathData="M24,36 C24,31.58 27.58,28 32,28 L60,28 C64.42,28 68,31.58 68,36 L68,72 C68,76.42 64.42,80 60,80 L32,80 C27.58,80 24,76.42 24,72 Z" />
+    <!-- Camera Lens Wing -->
+    <path
+        android:fillColor="#22D3EE"
+        android:pathData="M70,45 L84,35 L84,73 L70,63 Z" />
+    <!-- Bold Heart Reaction Emblem Inside Frame -->
+    <path
+        android:fillColor="#F43F5E"
+        android:pathData="M46,66 L43.4,63.6 C34.2,55.3 28,49.7 28,42.8 C28,37.2 32.4,32.8 38,32.8 C41.2,32.8 44.2,34.3 46,36.6 C47.8,34.3 50.8,32.8 54,32.8 C59.6,32.8 64,37.2 64,42.8 C64,49.7 57.8,55.3 48.6,63.6 L46,66 Z" />
+</vector>

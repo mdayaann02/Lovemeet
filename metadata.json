@@ -1,0 +1,6 @@
+{
+  "name": "PulseCall",
+  "description": "Real-time 1-on-1 video calling with live AI gesture and facial expression emoji reactions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

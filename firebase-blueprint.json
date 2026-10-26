@@ -1,0 +1,182 @@
+{
+  "entities": {
+    "CallRoom": {
+      "title": "CallRoom",
+      "description": "Represents a 1-on-1 video call room with WebRTC signaling and participant media states.",
+      "type": "object",
+      "properties": {
+        "roomCode": {
+          "type": "string",
+          "description": "Unique 4-16 character alphanumeric room code matching document ID."
+        },
+        "roomTitle": {
+          "type": "string",
+          "description": "Display title of the video call session."
+        },
+        "hostUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the room creator/host."
+        },
+        "hostName": {
+          "type": "string",
+          "description": "Display name of the host."
+        },
+        "guestUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the joined guest, or empty string if waiting."
+        },
+        "guestName": {
+          "type": "string",
+          "description": "Display name of the guest, or empty string if waiting."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["waiting", "active", "ended"],
+          "description": "Lifecycle status of the call room."
+        },
+        "hostMuted": {
+          "type": "boolean",
+          "description": "Whether the host microphone is muted."
+        },
+        "hostCameraOn": {
+          "type": "boolean",
+          "description": "Whether the host camera is active."
+        },
+        "hostScreenSharing": {
+          "type": "boolean",
+          "description": "Whether the host is sharing their screen."
+        },
+        "guestMuted": {
+          "type": "boolean",
+          "description": "Whether the guest microphone is muted."
+        },
+        "guestCameraOn": {
+          "type": "boolean",
+          "description": "Whether the guest camera is active."
+        },
+        "guestScreenSharing": {
+          "type": "boolean",
+          "description": "Whether the guest is sharing their screen."
+        },
+        "sdpOffer": {
+          "type": "string",
+          "description": "WebRTC SDP offer or signaling state payload from host."
+        },
+        "sdpAnswer": {
+          "type": "string",
+          "description": "WebRTC SDP answer or signaling state payload from guest."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when room was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when room was last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "roomCode",
+        "roomTitle",
+        "hostUid",
+        "hostName",
+        "guestUid",
+        "guestName",
+        "status",
+        "hostMuted",
+        "hostCameraOn",
+        "hostScreenSharing",
+        "guestMuted",
+        "guestCameraOn",
+        "guestScreenSharing",
+        "sdpOffer",
+        "sdpAnswer",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ReactionEvent": {
+      "title": "ReactionEvent",
+      "description": "Real-time AI gesture or manual emoji reaction synced across both call participants.",
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "description": "Room code ID where the reaction occurred."
+        },
+        "senderUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the participant who triggered the reaction."
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Display name of the sender."
+        },
+        "gestureType": {
+          "type": "string",
+          "enum": ["HEART", "KISS", "THUMBS_UP", "FIREWORKS", "PEACE", "LAUGH"],
+          "description": "Detected CV gesture or manual reaction type."
+        },
+        "emoji": {
+          "type": "string",
+          "description": "Primary emoji symbol rendered in the particle burst."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["AI_GESTURE", "MANUAL_BAR"],
+          "description": "Whether triggered by MediaPipe/CV landmark detection or manual fallback bar."
+        },
+        "originX": {
+          "type": "integer",
+          "description": "Normalized horizontal origin (0 to 100) for particle burst."
+        },
+        "originY": {
+          "type": "integer",
+          "description": "Normalized vertical origin (0 to 100) for particle burst."
+        },
+        "confidencePercent": {
+          "type": "integer",
+          "description": "Detection confidence score (0 to 100)."
+        },
+        "allowedUids": {
+          "type": "string",
+          "description": "Bounded list (1-2 elements) of participant UIDs authorized to read this reaction."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when reaction was emitted (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "roomId",
+        "senderUid",
+        "senderName",
+        "gestureType",
+        "emoji",
+        "source",
+        "originX",
+        "originY",
+        "confidencePercent",
+        "allowedUids",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomId}": {
+      "schema": {
+        "$ref": "#/entities/CallRoom"
+      },
+      "description": "1-on-1 video call rooms indexed by roomCode."
+    },
+    "/rooms/{roomId}/reactions/{reactionId}": {
+      "schema": {
+        "$ref": "#/entities/ReactionEvent"
+      },
+      "description": "Append-only stream of live gesture and facial expression emoji reactions."
+    }
+  }
+}
